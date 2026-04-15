@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: blacklight_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: blacklight
+      POSTGRES_PASSWORD: blacklight_dev
+      POSTGRES_DB: blacklight
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blacklight -d blacklight"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - blacklight_network
+
+  # Uncomment to run backend in Docker (optional for local development)
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   container_name: blacklight_api
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     DATABASE_URL: postgresql://blacklight:blacklight_dev@postgres:5432/blacklight
+  #     LLM_PROVIDER: ${LLM_PROVIDER:-xai_grok}
+  #     LLM_MODEL: ${LLM_MODEL:-grok-4-fast-non-reasoning}
+  #     OPENAI_API_KEY: ${OPENAI_API_KEY}
+  #     GROK_API_KEY: ${GROK_API_KEY}
+  #     HOST: 0.0.0.0
+  #     PORT: 8000
+  #     CORS_ORIGINS: http://localhost:5173,http://localhost:3000
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   networks:
+  #     - blacklight_network
+  #   volumes:
+  #     - ./backend:/app
+  #   command: uv run uvicorn src.blacklight.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Nginx reverse proxy - unified entry point for frontend and backend
+  nginx:
+    image: nginx:alpine
+    container_name: blacklight_nginx
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - postgres
+    networks:
+      - blacklight_network
+    extra_hosts:
+      # Allow Nginx to reach host services (frontend:5173, backend:8000)
+      - "host.docker.internal:host-gateway"
+
+  # Agent sandbox for secure agent execution (dynamically created)
+  # This service is referenced by the BuildPipeline but not started by default
+  # Containers are created on-demand per agent test run
+  agent-sandbox:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.agent-sandbox
+    image: blacklight_agent_sandbox:latest
+    # Resource limits for safety
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    # Read-only root filesystem (except /tmp and /app/generated)
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M,mode=1777
+    # No network access during tests for security
+    network_mode: none
+    # Volumes mounted at runtime by BuildPipeline
+    # Example: ./backend/generated:/app/generated:ro
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  blacklight_network:
+    driver: bridge

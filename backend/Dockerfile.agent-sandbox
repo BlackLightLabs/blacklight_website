@@ -1,0 +1,46 @@
+# Agent Sandbox Runtime Environment
+# Isolated environment for executing generated agents
+
+FROM python:3.11-slim
+
+LABEL maintainer="Blacklight Agent Builder"
+LABEL description="Isolated sandbox for agent execution and testing"
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    --no-install-recommends \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for fast Python package management
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:/root/.cargo/bin:$PATH"
+
+# Create directory for generated agents
+RUN mkdir -p /app/generated /tmp/agent-runs
+
+# Install core dependencies
+RUN uv pip install --system \
+    langchain-core==0.3.79 \
+    langchain-openai==0.3.35 \
+    langgraph==0.6.10 \
+    jsonschema==4.25.1 \
+    pytest==8.3.4 \
+    pytest-asyncio==0.24.0 \
+    pytest-json-report==1.5.0
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Resource limits (enforced at runtime via Docker)
+# - Memory: 512MB
+# - CPU: 1 core
+# - Network: isolated (no internet during tests)
+
+# Default command (will be overridden)
+CMD ["python", "--version"]

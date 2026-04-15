@@ -1,0 +1,4 @@
+# Ignore all generated agent code
+# Generated files are created dynamically during agent builds
+*
+!.gitignore

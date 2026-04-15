@@ -1,0 +1,39 @@
+# Environment variables (secrets)
+.env
+.env.local
+.env.*.local
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# Test artifacts
+playwright-report/
+test-results/
+coverage/
+.playwright-mcp/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+.cache/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Note: frontend/ and backend/ have their own .gitignore files for:
+# - frontend: node_modules, build artifacts, .react-router
+# - backend: __pycache__, .venv, dist, *.pyc
